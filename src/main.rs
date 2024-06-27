@@ -7,8 +7,6 @@ use ruscii::terminal::Window;
 
 mod cell;
 mod gamestate;
-mod piece;
-mod tetromino;
 
 fn main() {
     let mut fps_counter = FPSCounter::default();
