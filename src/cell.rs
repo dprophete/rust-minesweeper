@@ -1,5 +1,5 @@
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Cell {
-    Empty,
-    Bomb,
+    Hidden,
+    Revealed(usize),
 }

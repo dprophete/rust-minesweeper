@@ -11,13 +11,24 @@ const GRID_HEIGHT: i32 = 10;
 const GAMEOVER_WIDTH: i32 = 11;
 const GAMEOVER_HEIGHT: i32 = 3;
 
-const NB_BOMBS: i32 = 10;
+const NB_BOMBS: i32 = 40;
 
 #[derive(PartialEq)]
 enum RunningState {
     Running,
     GameOver,
 }
+
+static AROUND_OFFSETS: [(i32, i32); 8] = [
+    (-1, -1),
+    (0, -1),
+    (1, -1),
+    (-1, 0),
+    (1, 0),
+    (-1, 1),
+    (0, 1),
+    (1, 1),
+];
 
 pub struct GameState {
     dimension: Vec2,
@@ -38,7 +49,7 @@ impl GameState {
         Self {
             dimension: dim,
             step: 0,
-            grid: [[Cell::Empty; GRID_WIDTH as usize]; GRID_HEIGHT as usize],
+            grid: [[Cell::Hidden; GRID_WIDTH as usize]; GRID_HEIGHT as usize],
             grid_pos: Vec2::xy((dim.x - GRID_WIDTH) / 2, (dim.y - GRID_HEIGHT) / 2),
             bombs: [Vec2::xy(-1, -1); NB_BOMBS as usize],
             cursor: Vec2::xy(0, 0),
@@ -60,7 +71,7 @@ impl GameState {
             rand::thread_rng().gen_range(0..GRID_WIDTH),
             rand::thread_rng().gen_range(0..GRID_HEIGHT),
         );
-        if self.bombs.contains(&pos) {
+        if self.is_on_bomb(&pos) {
             return self.find_empty_bomb_pos();
         }
         pos
@@ -97,6 +108,7 @@ impl GameState {
             Key::Right => self.move_cursor(Vec2::xy(1, 0)),
             Key::Up => self.move_cursor(Vec2::xy(0, -1)),
             Key::Down => self.move_cursor(Vec2::xy(0, 1)),
+            Key::Space => self.reveal(),
             _ => (),
         }
         self.prev_key = Some(key_down);
@@ -116,8 +128,6 @@ impl GameState {
             }
             return;
         }
-
-        // moving current piece
     }
 
     fn gameover(&mut self) {
@@ -135,6 +145,14 @@ impl GameState {
 
     fn draw_gameover(&mut self, pencil: &mut Pencil) {
         self.draw_running(pencil);
+
+        // bombs
+        self.bombs.iter().for_each(|&pos| {
+            let pos = self.tx_to_grid(pos.x, pos.y);
+            pencil.set_background(Color::Red).draw_text("X", pos);
+        });
+
+        // gameover box
         pencil
             .set_foreground(Color::Xterm(230))
             .set_background(Color::Xterm(100));
@@ -145,6 +163,17 @@ impl GameState {
     }
 
     fn draw_running(&mut self, pencil: &mut Pencil) {
+        // instructions
+        let mut y = 0;
+        pencil.set_foreground(Color::White);
+        pencil.draw_text(&format!("arrow keys: move"), self.tx_to_grid(-25, y));
+        y += 1;
+        pencil.draw_text(&format!("space: reveal"), self.tx_to_grid(-25, y));
+        y += 1;
+        pencil.draw_text(&format!("return: guess"), self.tx_to_grid(-25, y));
+        y += 2;
+        pencil.draw_text(&format!("q/esc: quit"), self.tx_to_grid(-25, y));
+
         // draw border
         pencil
             .set_background(Color::Black)
@@ -166,17 +195,30 @@ impl GameState {
                 let x = x as i32;
                 let pos = self.tx_to_grid(x, y);
                 match cell {
-                    Cell::Empty => pencil.set_background(Color::Black).draw_text("∙", pos),
-                    Cell::Bomb => pencil.set_background(Color::Red).draw_text("X", pos),
+                    Cell::Hidden => {
+                        _ = pencil
+                            .set_background(Color::Black)
+                            .set_foreground(Color::LightGrey)
+                            .draw_text(" ", pos)
+                    }
+                    Cell::Revealed(nb) => {
+                        _ = {
+                            if *nb == 0 {
+                                pencil
+                                    .set_background(Color::LightGrey)
+                                    .set_foreground(Color::LightGrey)
+                                    .draw_text(" ", pos);
+                            } else {
+                                pencil
+                                    .set_background(Color::LightGrey)
+                                    .set_foreground(Color::Blue)
+                                    .draw_text(&format!("{}", nb), pos);
+                            }
+                        }
+                    }
                 };
             }
         }
-
-        // bombs
-        self.bombs.iter().for_each(|&pos| {
-            let pos = self.tx_to_grid(pos.x, pos.y);
-            pencil.set_background(Color::Red).draw_text("X", pos);
-        });
 
         // cursor
         let pos = self.tx_to_grid(self.cursor.x, self.cursor.y);
@@ -186,6 +228,45 @@ impl GameState {
     //--------------------------------------------------------------------------------
     // helpers
     //--------------------------------------------------------------------------------
+
+    fn nb_bombs_on_pos(&mut self, pos: &Vec2) -> usize {
+        let x = pos.x as i32;
+        let y = pos.y as i32;
+        AROUND_OFFSETS
+            .iter()
+            .map(|(dx, dy)| Vec2::xy(x + dx, y + dy))
+            .filter(|&pos| self.is_in_grid(&pos))
+            .filter(|&pos| self.is_on_bomb(&pos))
+            .count()
+    }
+
+    fn reveal(&mut self) {
+        if self.is_on_bomb(&self.cursor) {
+            // we clicked on a bomb...
+            self.gameover();
+            return;
+        }
+        if self.grid[self.cursor.y as usize][self.cursor.x as usize] != Cell::Hidden {
+            // cell was already revealed
+            return;
+        }
+        let mut cells_to_check = vec![self.cursor];
+        while let Some(pos) = cells_to_check.pop() {
+            let nb_bombs = self.nb_bombs_on_pos(&pos);
+            self.grid[pos.y as usize][pos.x as usize] = Cell::Revealed(nb_bombs);
+            if nb_bombs == 0 {
+                let x = pos.x as i32;
+                let y = pos.y as i32;
+                // add all surrounding cells to list
+                AROUND_OFFSETS
+                    .iter()
+                    .map(|(dx, dy)| Vec2::xy(x + dx, y + dy))
+                    .filter(|&pos| self.is_in_grid(&pos))
+                    .filter(|&pos| self.grid[pos.y as usize][pos.x as usize] == Cell::Hidden)
+                    .for_each(|pos| cells_to_check.push(pos))
+            }
+        }
+    }
 
     fn move_cursor(&mut self, delta: Vec2) {
         self.cursor += delta;
@@ -199,12 +280,11 @@ impl GameState {
         return Vec2::xy(x + self.grid_pos.x, y + self.grid_pos.y);
     }
 
-    fn is_in_grid(&self, pos: Vec2) -> bool {
+    fn is_in_grid(&self, pos: &Vec2) -> bool {
         pos.x >= 0 && pos.x < GRID_WIDTH && pos.y >= 0 && pos.y < GRID_HEIGHT
     }
 
-    fn is_in_empty_pos(&self, pos: Vec2) -> bool {
-        let cell = self.grid[pos.y as usize][pos.x as usize];
-        cell == Cell::Empty
+    fn is_on_bomb(&self, pos: &Vec2) -> bool {
+        self.bombs.contains(pos)
     }
 }
