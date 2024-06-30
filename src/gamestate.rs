@@ -209,10 +209,10 @@ impl GameState {
         pencil.draw_vline('│', self.tx_to_grid(GRID_WIDTH, 0) - vd, GRID_HEIGHT * 3);
         pencil.draw_hline('─', self.tx_to_grid(0, -1) + vd, GRID_WIDTH * 5);
         pencil.draw_hline('─', self.tx_to_grid(0, GRID_HEIGHT) - vd, GRID_WIDTH * 5);
-        pencil.draw_text("╰", self.tx_to_grid(0, GRID_HEIGHT) - vd - vr);
-        pencil.draw_text("╯", self.tx_to_grid(GRID_WIDTH, GRID_HEIGHT) - vd);
         pencil.draw_text("╭", self.tx_to_grid(0, -1) + vd - vr);
+        pencil.draw_text("╰", self.tx_to_grid(0, GRID_HEIGHT) - vd - vr);
         pencil.draw_text("╮", self.tx_to_grid(GRID_WIDTH, -1) + vd);
+        pencil.draw_text("╯", self.tx_to_grid(GRID_WIDTH, GRID_HEIGHT) - vd);
 
         // draw grid
         for (y, row) in self.grid.iter().enumerate() {
