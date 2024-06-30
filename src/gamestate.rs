@@ -1,3 +1,5 @@
+// https://www.w3.org/2001/06/utf-8-test/UTF-8-demo.html
+
 use std::cmp::{max, min};
 
 use rand::Rng;
@@ -11,7 +13,7 @@ const GRID_HEIGHT: i32 = 10;
 const GAMEOVER_WIDTH: i32 = 11;
 const GAMEOVER_HEIGHT: i32 = 3;
 
-const NB_BOMBS: i32 = 40;
+const NB_BOMBS: i32 = 20;
 
 #[derive(PartialEq)]
 enum RunningState {
@@ -50,7 +52,7 @@ impl GameState {
             dimension: dim,
             step: 0,
             grid: [[Cell::Hidden; GRID_WIDTH as usize]; GRID_HEIGHT as usize],
-            grid_pos: Vec2::xy((dim.x - GRID_WIDTH) / 2, (dim.y - GRID_HEIGHT) / 2),
+            grid_pos: Vec2::xy((dim.x - GRID_WIDTH * 5) / 2, (dim.y - GRID_HEIGHT * 3) / 2),
             bombs: [Vec2::xy(-1, -1); NB_BOMBS as usize],
             cursor: Vec2::xy(0, 0),
             running: RunningState::Running,
@@ -96,6 +98,7 @@ impl GameState {
             match key_down {
                 // don't repeat these
                 Key::Space => {}
+                Key::F => {}
                 // everything else, we just slow down the repeat
                 _ => self.prev_key = None,
             }
@@ -109,6 +112,7 @@ impl GameState {
             Key::Up => self.move_cursor(Vec2::xy(0, -1)),
             Key::Down => self.move_cursor(Vec2::xy(0, 1)),
             Key::Space => self.reveal(),
+            Key::F | Key::Enter => self.flag(),
             _ => (),
         }
         self.prev_key = Some(key_down);
@@ -144,12 +148,18 @@ impl GameState {
     }
 
     fn draw_gameover(&mut self, pencil: &mut Pencil) {
+        let vd = Vec2::xy(0, 1); // down
+        let vr = Vec2::xy(1, 0); // right
         self.draw_running(pencil);
 
         // bombs
         self.bombs.iter().for_each(|&pos| {
             let pos = self.tx_to_grid(pos.x, pos.y);
-            pencil.set_background(Color::Red).draw_text("X", pos);
+            pencil
+                .set_background(Color::Red)
+                .draw_text(" ╲ ╱ ", pos - vd)
+                .draw_text("  ╳  ", pos)
+                .draw_text(" ╱ ╲ ", pos + vd);
         });
 
         // gameover box
@@ -157,72 +167,109 @@ impl GameState {
             .set_foreground(Color::Xterm(230))
             .set_background(Color::Xterm(100));
         let Vec2 { x, y } = self.gameover_pos;
-        pencil.draw_text("           ", self.tx_to_grid(x, y));
-        pencil.draw_text(" GAME OVER ", self.tx_to_grid(x, y + 1));
-        pencil.draw_text("           ", self.tx_to_grid(x, y + 2));
+        pencil.draw_text("           ", self.tx_to_grid(x, y) - vd);
+        pencil.draw_text(" GAME OVER ", self.tx_to_grid(x, y));
+        pencil.draw_text("           ", self.tx_to_grid(x, y) + vd);
     }
 
     fn draw_running(&mut self, pencil: &mut Pencil) {
-        // instructions
+        let vd = Vec2::xy(0, 1); // down
+        let vr = Vec2::xy(1, 0); // right
+                                 // instructions
         let mut y = 0;
         pencil.set_foreground(Color::White);
-        pencil.draw_text(&format!("arrow keys: move"), self.tx_to_grid(-25, y));
+        pencil.draw_text(&format!("arrow keys: move"), self.tx_to_grid(-5, y));
         y += 1;
-        pencil.draw_text(&format!("space: reveal"), self.tx_to_grid(-25, y));
+        pencil.draw_text(&format!("space: reveal"), self.tx_to_grid(-5, y));
         y += 1;
-        pencil.draw_text(&format!("return: guess"), self.tx_to_grid(-25, y));
+        pencil.draw_text(&format!("enter/f: flag"), self.tx_to_grid(-5, y));
         y += 2;
-        pencil.draw_text(&format!("q/esc: quit"), self.tx_to_grid(-25, y));
+        pencil.draw_text(&format!("q/esc: quit"), self.tx_to_grid(-5, y));
+
+        // score
+        y = 0;
+        let mut nb_flags = 0;
+        for row in self.grid.iter() {
+            for cell in row.iter() {
+                if *cell == Cell::Flag {
+                    nb_flags += 1;
+                }
+            }
+        }
+
+        pencil.draw_text(
+            &format!("bombs: {}", NB_BOMBS - nb_flags),
+            self.tx_to_grid(GRID_WIDTH + 1, y),
+        );
 
         // draw border
         pencil
             .set_background(Color::Black)
             .set_foreground(Color::Xterm(250));
-        pencil.draw_vline('|', self.tx_to_grid(-1, 0), GRID_HEIGHT);
-        pencil.draw_vline('|', self.tx_to_grid(GRID_WIDTH, 0), GRID_HEIGHT);
-        pencil.draw_hline('-', self.tx_to_grid(0, -1), GRID_WIDTH);
-        pencil.draw_hline('-', self.tx_to_grid(0, GRID_HEIGHT), GRID_WIDTH);
-        pencil.draw_text("+", self.tx_to_grid(-1, GRID_HEIGHT));
-        pencil.draw_text("+", self.tx_to_grid(GRID_WIDTH, GRID_HEIGHT));
-        pencil.draw_text("+", self.tx_to_grid(-1, -1));
-        pencil.draw_text("+", self.tx_to_grid(GRID_WIDTH, -1));
+        pencil.draw_vline('|', self.tx_to_grid(0, 0) - vd - vr, GRID_HEIGHT * 3);
+        pencil.draw_vline('|', self.tx_to_grid(GRID_WIDTH, 0) - vd, GRID_HEIGHT * 3);
+        pencil.draw_hline('-', self.tx_to_grid(0, -1) + vd, GRID_WIDTH * 5);
+        pencil.draw_hline('-', self.tx_to_grid(0, GRID_HEIGHT) - vd, GRID_WIDTH * 5);
+        pencil.draw_text("+", self.tx_to_grid(0, GRID_HEIGHT) - vd - vr);
+        pencil.draw_text("+", self.tx_to_grid(GRID_WIDTH, GRID_HEIGHT) - vd);
+        pencil.draw_text("+", self.tx_to_grid(0, -1) + vd - vr);
+        pencil.draw_text("+", self.tx_to_grid(GRID_WIDTH, -1) + vd);
 
         // draw grid
-        pencil.set_foreground(Color::Xterm(240));
         for (y, row) in self.grid.iter().enumerate() {
             let y = y as i32;
             for (x, cell) in row.iter().enumerate() {
                 let x = x as i32;
                 let pos = self.tx_to_grid(x, y);
+
+                let bg = if self.cursor.x == x && self.cursor.y == y {
+                    Color::Blue
+                } else {
+                    Color::Black
+                };
                 match cell {
                     Cell::Hidden => {
+                        // not revealed yet
                         _ = pencil
-                            .set_background(Color::Black)
+                            .set_background(bg)
                             .set_foreground(Color::LightGrey)
-                            .draw_text(" ", pos)
+                            .draw_text(&format!("     "), pos - vd)
+                            .draw_text("  ∙  ", pos)
+                            .draw_text(&format!("     "), pos + vd);
+                    }
+                    Cell::Flag => {
+                        // flag
+                        _ = pencil
+                            .set_background(bg)
+                            .set_foreground(Color::Red)
+                            .draw_text(&format!("╔═══╗"), pos - vd)
+                            .draw_text("║ ╳ ║", pos)
+                            .draw_text(&format!("╚═══╝"), pos + vd);
                     }
                     Cell::Revealed(nb) => {
                         _ = {
                             if *nb == 0 {
+                                // empty
                                 pencil
-                                    .set_background(Color::LightGrey)
+                                    .set_background(bg)
                                     .set_foreground(Color::LightGrey)
-                                    .draw_text(" ", pos);
+                                    .draw_text("     ", pos - vd)
+                                    .draw_text("     ", pos)
+                                    .draw_text("     ", pos + vd);
                             } else {
+                                // number
                                 pencil
-                                    .set_background(Color::LightGrey)
-                                    .set_foreground(Color::Blue)
-                                    .draw_text(&format!("{}", nb), pos);
+                                    .set_background(bg)
+                                    .set_foreground(Color::Grey)
+                                    .draw_text(&format!("┌───┐"), pos - vd)
+                                    .draw_text(&format!("│ {} │", nb), pos)
+                                    .draw_text(&format!("└───┘"), pos + vd);
                             }
                         }
                     }
                 };
             }
         }
-
-        // cursor
-        let pos = self.tx_to_grid(self.cursor.x, self.cursor.y);
-        pencil.set_background(Color::Blue).draw_text("+", pos);
     }
 
     //--------------------------------------------------------------------------------
@@ -238,6 +285,14 @@ impl GameState {
             .filter(|&pos| self.is_in_grid(&pos))
             .filter(|&pos| self.is_on_bomb(&pos))
             .count()
+    }
+
+    fn flag(&mut self) {
+        match self.grid[self.cursor.y as usize][self.cursor.x as usize] {
+            Cell::Hidden => self.grid[self.cursor.y as usize][self.cursor.x as usize] = Cell::Flag,
+            Cell::Revealed(_) => return,
+            Cell::Flag => self.grid[self.cursor.y as usize][self.cursor.x as usize] = Cell::Hidden,
+        }
     }
 
     fn reveal(&mut self) {
@@ -277,7 +332,7 @@ impl GameState {
     }
 
     fn tx_to_grid(&self, x: i32, y: i32) -> Vec2 {
-        return Vec2::xy(x + self.grid_pos.x, y + self.grid_pos.y);
+        return Vec2::xy(x * 5 + self.grid_pos.x, y * 3 + self.grid_pos.y);
     }
 
     fn is_in_grid(&self, pos: &Vec2) -> bool {

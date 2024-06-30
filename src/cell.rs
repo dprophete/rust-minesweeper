@@ -2,4 +2,5 @@
 pub enum Cell {
     Hidden,
     Revealed(usize),
+    Flag,
 }
