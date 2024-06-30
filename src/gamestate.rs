@@ -10,7 +10,7 @@ use crate::cell::Cell;
 const GRID_WIDTH: i32 = 20;
 const GRID_HEIGHT: i32 = 10;
 
-const GAMEOVER_WIDTH: i32 = 11;
+const GAMEOVER_WIDTH: i32 = 21;
 const GAMEOVER_HEIGHT: i32 = 3;
 
 const NB_BOMBS: i32 = 20;
@@ -119,12 +119,15 @@ impl GameState {
 
     pub fn update(&mut self) {
         if self.running == RunningState::GameOver {
-            if (self.step as i32) % 4 == 0 {
+            if (self.step as i32) % 3 == 0 {
                 self.gameover_pos += self.gameover_speed;
-                if self.gameover_pos.x + GAMEOVER_WIDTH == GRID_WIDTH || self.gameover_pos.x == 0 {
+                if self.gameover_pos.x + GAMEOVER_WIDTH == GRID_WIDTH * 5
+                    || self.gameover_pos.x == 0
+                {
                     self.gameover_speed.x = -self.gameover_speed.x
                 }
-                if self.gameover_pos.y + GAMEOVER_HEIGHT == GRID_HEIGHT || self.gameover_pos.y == 0
+                if self.gameover_pos.y + GAMEOVER_HEIGHT == GRID_HEIGHT * 3
+                    || self.gameover_pos.y == 0
                 {
                     self.gameover_speed.y = -self.gameover_speed.y
                 }
@@ -135,7 +138,7 @@ impl GameState {
 
     fn gameover(&mut self) {
         self.running = RunningState::GameOver;
-        self.gameover_pos = Vec2::xy((GRID_WIDTH - GAMEOVER_WIDTH) / 2, 2);
+        self.gameover_pos = Vec2::xy((GRID_WIDTH * 5 - GAMEOVER_WIDTH) / 2, 2);
         self.gameover_speed = Vec2::xy(1, 1);
     }
 
@@ -166,9 +169,9 @@ impl GameState {
             .set_foreground(Color::Xterm(230))
             .set_background(Color::Xterm(100));
         let Vec2 { x, y } = self.gameover_pos;
-        pencil.draw_text("           ", self.tx_to_grid(x, y) - vd);
-        pencil.draw_text(" GAME OVER ", self.tx_to_grid(x, y));
-        pencil.draw_text("           ", self.tx_to_grid(x, y) + vd);
+        pencil.draw_text("                     ", self.tx_to_grid_no_scale(x, y) - vd);
+        pencil.draw_text("  G A M E   O V E R  ", self.tx_to_grid_no_scale(x, y));
+        pencil.draw_text("                     ", self.tx_to_grid_no_scale(x, y) + vd);
     }
 
     fn draw_running(&mut self, pencil: &mut Pencil) {
@@ -346,6 +349,10 @@ impl GameState {
 
     fn tx_to_grid(&self, x: i32, y: i32) -> Vec2 {
         return Vec2::xy(x * 5 + self.grid_pos.x, y * 3 + self.grid_pos.y);
+    }
+
+    fn tx_to_grid_no_scale(&self, x: i32, y: i32) -> Vec2 {
+        return Vec2::xy(x + self.grid_pos.x, y + self.grid_pos.y);
     }
 
     fn is_in_grid(&self, pos: &Vec2) -> bool {
