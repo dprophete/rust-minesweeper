@@ -97,8 +97,7 @@ impl GameState {
         if Some(key_down) == self.prev_key {
             match key_down {
                 // don't repeat these
-                Key::Space => {}
-                Key::F => {}
+                Key::Space | Key::F | Key::Enter => {}
                 // everything else, we just slow down the repeat
                 _ => self.prev_key = None,
             }
@@ -206,14 +205,14 @@ impl GameState {
         pencil
             .set_background(Color::Black)
             .set_foreground(Color::Xterm(250));
-        pencil.draw_vline('|', self.tx_to_grid(0, 0) - vd - vr, GRID_HEIGHT * 3);
-        pencil.draw_vline('|', self.tx_to_grid(GRID_WIDTH, 0) - vd, GRID_HEIGHT * 3);
-        pencil.draw_hline('-', self.tx_to_grid(0, -1) + vd, GRID_WIDTH * 5);
-        pencil.draw_hline('-', self.tx_to_grid(0, GRID_HEIGHT) - vd, GRID_WIDTH * 5);
-        pencil.draw_text("+", self.tx_to_grid(0, GRID_HEIGHT) - vd - vr);
-        pencil.draw_text("+", self.tx_to_grid(GRID_WIDTH, GRID_HEIGHT) - vd);
-        pencil.draw_text("+", self.tx_to_grid(0, -1) + vd - vr);
-        pencil.draw_text("+", self.tx_to_grid(GRID_WIDTH, -1) + vd);
+        pencil.draw_vline('│', self.tx_to_grid(0, 0) - vd - vr, GRID_HEIGHT * 3);
+        pencil.draw_vline('│', self.tx_to_grid(GRID_WIDTH, 0) - vd, GRID_HEIGHT * 3);
+        pencil.draw_hline('─', self.tx_to_grid(0, -1) + vd, GRID_WIDTH * 5);
+        pencil.draw_hline('─', self.tx_to_grid(0, GRID_HEIGHT) - vd, GRID_WIDTH * 5);
+        pencil.draw_text("╰", self.tx_to_grid(0, GRID_HEIGHT) - vd - vr);
+        pencil.draw_text("╯", self.tx_to_grid(GRID_WIDTH, GRID_HEIGHT) - vd);
+        pencil.draw_text("╭", self.tx_to_grid(0, -1) + vd - vr);
+        pencil.draw_text("╮", self.tx_to_grid(GRID_WIDTH, -1) + vd);
 
         // draw grid
         for (y, row) in self.grid.iter().enumerate() {
@@ -223,7 +222,7 @@ impl GameState {
                 let pos = self.tx_to_grid(x, y);
 
                 let bg = if self.cursor.x == x && self.cursor.y == y {
-                    Color::Blue
+                    Color::Xterm(234)
                 } else {
                     Color::Black
                 };
@@ -236,6 +235,9 @@ impl GameState {
                             .draw_text(&format!("     "), pos - vd)
                             .draw_text("  ∙  ", pos)
                             .draw_text(&format!("     "), pos + vd);
+                        // +                            .draw_text(&format!("▇▇▇▇▇▇"), pos - vd)
+                        // +                            .draw_text("████▉", pos)
+                        // +                            .draw_text(&format!("████▉"), pos + vd);
                     }
                     Cell::Flag => {
                         // flag
@@ -257,13 +259,24 @@ impl GameState {
                                     .draw_text("     ", pos)
                                     .draw_text("     ", pos + vd);
                             } else {
+                                let color = match nb {
+                                    1 => Color::Blue,
+                                    2 => Color::Green,
+                                    3 => Color::Red,
+                                    4 => Color::Magenta,
+                                    5 => Color::Yellow,
+                                    6 => Color::Cyan,
+                                    7 => Color::White,
+                                    8 => Color::Grey,
+                                    _ => Color::Grey,
+                                };
                                 // number
                                 pencil
                                     .set_background(bg)
-                                    .set_foreground(Color::Grey)
-                                    .draw_text(&format!("┌───┐"), pos - vd)
+                                    .set_foreground(color)
+                                    .draw_text(&format!("╭───╮"), pos - vd)
                                     .draw_text(&format!("│ {} │", nb), pos)
-                                    .draw_text(&format!("└───┘"), pos + vd);
+                                    .draw_text(&format!("╰───╯"), pos + vd);
                             }
                         }
                     }
