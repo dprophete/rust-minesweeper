@@ -19,6 +19,7 @@ const NB_BOMBS: i32 = 20;
 enum RunningState {
     Running,
     GameOver,
+    Win,
 }
 
 static AROUND_OFFSETS: [(i32, i32); 8] = [
@@ -146,7 +147,12 @@ impl GameState {
         match self.running {
             RunningState::Running => self.draw_running(pencil),
             RunningState::GameOver => self.draw_gameover(pencil),
+            RunningState::Win => self.draw_win(pencil),
         }
+    }
+
+    fn draw_win(&mut self, pencil: &mut Pencil) {
+        self.draw_running(pencil);
     }
 
     fn draw_gameover(&mut self, pencil: &mut Pencil) {
